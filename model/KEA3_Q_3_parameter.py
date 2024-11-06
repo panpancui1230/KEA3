@@ -17,7 +17,7 @@ from IPython.core.display import display, HTML
 import csv
 import warnings
 
-# from painter import Plotting
+from painter import Plotting
 from utils import standard_constants
 from utils import standard_initial_states
 from utils import sim_states
@@ -68,7 +68,7 @@ points_per_segment=1000
 
 
 #Function f calculates the changes in state for the entire systems
-def f(t, y,ratio_absorb,PSII_content_per_leaf,pKreg, max_PSII, kQA, max_b6f, lumen_protons_per_turnover, PAR, ATP_synthase_max_turnover, 
+def f(t, y, ratio_absorb,PSII_content_per_leaf,pKreg, max_PSII, kQA, max_b6f, lumen_protons_per_turnover, PAR, ATP_synthase_max_turnover, 
     PSII_antenna_size, Volts_per_charge, perm_K, n, Em7_PQH2, Em7_PC,Em_Fd, PSI_antenna_size, 
     buffering_capacity, VDE_max_turnover_number, pKvde, VDE_Hill, kZE, pKPsbS, max_NPQ, k_recomb, k_PC_to_P700, 
     triplet_yield, triplet_to_singletO2_yield, fraction_pH_effect, k_Fd_to_NADP, k_CBC, k_KEA, k_VCCN1, k_CLCE, k_NDH): 
@@ -259,8 +259,8 @@ def do_complete_sim(y00, t_end, Kx):
         
     soln = solve_ivp(f, [0, t_end], y00, args=Kx.as_tuple(), method = 'BDF', \
                      t_eval = np.linspace(0, t_end, 10*t_end+1), max_step = 5)
-    # soln = solve_ivp(f, [0, t_end], y00, args=(LIGHT, *Kx.as_tuple()), method = 'BDF', \
-    #                  t_eval = np.linspace(0, t_end, 10*t_end+1), max_step = 5)
+
+
     time_axis = soln.t
             
         #append a set of computed constants to the output arrays
@@ -459,14 +459,14 @@ def dark_equibration(y_initial, Kx, total_duration, **keyword_parameters):
         return(dark_equilibrated_initial_y)
 
     
-# global_painter = Plotting()
-# plot_results={}
-# plot_results['pmf_params']=global_painter.plot_pmf_params
-# plot_results['pmf_params_offset']=global_painter.plot_pmf_params_offset
-# plot_results['K_and_parsing']=global_painter.plot_K_and_parsing
-# plot_results['plot_QAm_and_singletO2']=global_painter.plot_QAm_and_singletO2
-# plot_results['plot_cum_LEF_singetO2']=global_painter.plot_cum_LEF_singetO2
-# plot_results['b6f_and_balance'] = global_painter.b6f_and_balance
+global_painter = Plotting()
+plot_results={}
+plot_results['pmf_params']=global_painter.plot_pmf_params
+plot_results['pmf_params_offset']=global_painter.plot_pmf_params_offset
+plot_results['K_and_parsing']=global_painter.plot_K_and_parsing
+plot_results['plot_QAm_and_singletO2']=global_painter.plot_QAm_and_singletO2
+plot_results['plot_cum_LEF_singetO2']=global_painter.plot_cum_LEF_singetO2
+plot_results['b6f_and_balance'] = global_painter.b6f_and_balance
     
 
 class ListTable(list):
@@ -502,92 +502,98 @@ def process_a_gtype(gtype_dict, parameter_list, out_dict, gtype='a_genotype'):
     for para in parameter_list:
         gtype_dict[para] = out_dict[para]#store in dictionary for further calculation
         # gtype_df[para] = out_dict[para]
-        gtype_df[para] = out_dict[para][-10:]  # Retain only the last 10 data points
+        gtype_df[para] = [np.mean(out_dict[para][-20:])]  # Retain only the last 10 data points
+    return gtype_df
+    # file_path = './logs/' + gtype + '_simulated.csv'
+    # gtype_df.to_csv(file_path)
+   
+def sim_a_gtype(gtype_dict, idx=0, light = 100):  
+    parameters_of_interest = ['time_axis','NPQ','Phi2','LEF','qL','Z','V',\
+                          'pmf','Dy','pHlumen','fraction_Dy','fraction_DpH',\
+                          'Klumen','Cl_lumen','Cl_stroma']
+
+    initial_sim_states=sim_states()
+    initial_sim_state_list=initial_sim_states.as_list()
+
+    print("----sim func----")
+    print(initial_sim_state_list)
+
+    Kx_initial=sim_constants()    
+
+    constants_dict={}
+    k_CBC_light = 60 * (light/(light+250))#this needs change with different light intensity    
+
+    output_dict={}
+    on = str(idx)
+    Kx=sim_constants()
+    # if 'clce2' in gtype:
+    #     Kx.k_CLCE = 0
+    # if 'kea3' in gtype:
+    #     Kx.k_KEA =0
+    # if 'vccn1' in gtype:
+    #     Kx.k_VCCN1 =0
+    Kx.k_CBC = k_CBC_light
+    csv_file='./data/constants_3_para.csv'
+    data_df = pd.read_csv(csv_file) # get the changing constants dataframe
+    varying = data_df.loc[idx, data_df.columns[:3]]  # take row index, and first 3 columns
     
-    file_path = './logs/' + gtype + '_simulated.csv'
-    gtype_df.to_csv(file_path)
-
-# 从 CSV 文件中读取所有参数
-df = pd.read_csv('/Users/panpan/Desktop/model_修改/KEA3 2/model/data/constants.csv')  # 请将 'parameters.csv' 替换为实际文件路径
-
-# 提取前3个变化的变量组合
-varying_parameters = df[['ratio_absorb', 'PSII_content_per_leaf', 'PSII_antenna_size']]
-
-# 提取常量（假设所有行常量相同）
-constant_parameters = df.iloc[0, 3:].to_dict()  # 只读取一次常量
-
-
-def sim_a_gtype(gtype_dict, gtype='WT', light=100, simulation_params=None):
-    # 如果 simulation_params 为 None，则使用一个空字典
-    if simulation_params is None:
-        simulation_params = {}
-    parameters_of_interest = ['time_axis', 'NPQ', 'Phi2', 'LEF', 'qL', 'Z', 'V',
-                              'pmf', 'Dy', 'pHlumen', 'fraction_Dy', 'fraction_DpH',
-                              'Klumen', 'Cl_lumen', 'Cl_stroma']
-
-    # 初始化初始状态和常量
-    initial_sim_states = sim_states()
-    initial_sim_state_list = initial_sim_states.as_list()
     
-    # 初始化常量对象并更新为传入的参数
-    Kx = sim_constants()
-    for key, value in simulation_params.items():
-        setattr(Kx, key, value)  # 动态设置Kx对象中的参数
-    # 特定基因型调整
-    if 'clce2' in gtype:
-        Kx.k_CLCE = 0
-    if 'kea3' in gtype:
-        Kx.k_KEA = 0
-    if 'vccn1' in gtype:
-        Kx.k_VCCN1 = 0
-    Kx.k_CBC = 60 * (light / (light + 250))
 
-    # 运行仿真
-    output_dict = sim_ivp(Kx, initial_sim_state_list, 1200)
-    output_dict['qL'] = 1 - output_dict['QAm']
+    # now change the constants
+    Kx.ratio_absorb = varying[0]
+    Kx.PSII_content_per_leaf = varying[1]
+    Kx.PSII_antenna_size = varying[2]
 
-    # 可视化和结果处理
+
+    # new_scv_file = './data/initial_states.csv'
+    # data_is = pd.read_csv(new_scv_file)
+    # new_verifying = data_is.loc[idx, data_is.columns[:3]]
+    # Kx.P700_red_initial = new_verifying[0]
+    # Kx.PSII_content_per_leaf = new_verifying[1]
+    # Kx.PSII_antenna_size = new_verifying[2]
+
+
+    
+    # 输出当前的 ratio_absorb、PSII_content_per_leaf 和 PSII_antenna_size 值
+    print(f"Current parameters for idx {idx}:")
+    print(f"ratio_absorb: {Kx.ratio_absorb}")
+    print(f"PSII_content_per_leaf: {Kx.PSII_content_per_leaf}")
+    print(f"PSII_antenna_size: {Kx.PSII_antenna_size}")
+    # print(f"P700_red_initial:{initial_sim_state_list[0]}")
+    # print(f"P700_red_initial:", Kx.P700_red_initial)
+
+    constants_dict[on]=Kx #store constants in constants_dict
+
+    output_dict=sim_ivp(Kx, initial_sim_state_list, 1200)
+    Changed_Constants_Table('Change Constants', Kx_initial, Kx)
+    output_dict['qL'] = 1-output_dict['QAm']
     # paint = Plotting()
-    # paint.plot_interesting_stuff(gtype, output_dict)
-    process_a_gtype(gtype_dict, parameters_of_interest, output_dict, gtype + '_' + str(light) + 'uE')
+    # paint.plot_interesting_stuff(str(idx), output_dict)
 
-# def sim_a_gtype(gtype_dict, gtype='WT', light = 100):  
-#     parameters_of_interest = ['time_axis','NPQ','Phi2','LEF','qL','Z','V',\
-#                           'pmf','Dy','pHlumen','fraction_Dy','fraction_DpH',\
-#                           'Klumen','Cl_lumen','Cl_stroma']
+    # plot_interesting_stuff(gtype, output_dict)
+    # process_a_gtype(gtype_dict,parameters_of_interest, output_dict, str(idx)+'_'+str(light)+'uE')   
+    return process_a_gtype(gtype_dict,parameters_of_interest,output_dict,str(idx)+'_'+str(light)+'uE') 
 
-#     initial_sim_states=sim_states()
-#     initial_sim_state_list=initial_sim_states.as_list()
-#     Kx_initial=sim_constants()    
 
-#     constants_dict={}
-#     k_CBC_light = 60 * (light/(light+250))#this needs change with different light intensity    
-
-#     output_dict={}
-#     on = gtype
-#     Kx=sim_constants()
-    
-#     if 'clce2' in gtype:
-#         Kx.k_CLCE = 0
-#     if 'kea3' in gtype:
-#         Kx.k_KEA =0
-#     if 'vccn1' in gtype:
-#         Kx.k_VCCN1 =0
-#     Kx.k_CBC = k_CBC_light
-#     constants_dict[on]=Kx #store constants in constants_dict
-
-#     output_dict=sim_ivp(Kx, initial_sim_state_list, 1200)
-#     Changed_Constants_Table('Change Constants', Kx_initial, Kx)
-#     output_dict['qL'] = 1-output_dict['QAm']
-#     paint = Plotting()
-#     paint.plot_interesting_stuff(gtype, output_dict)
-#     # plot_interesting_stuff(gtype, output_dict)
-#     process_a_gtype(gtype_dict,parameters_of_interest, output_dict,gtype+'_'+str(light)+'uE')    
-
+# 修改 do_stuff 函数，累积 1000 个仿真结果并保存到单个 CSV 文件
 def do_stuff(LIGHT):
-    print(LIGHT)
-    WT = {}
-    sim_a_gtype(WT, 'WT', LIGHT)
+    print(f"Running simulations for LIGHT intensity: {LIGHT}")
+    combined_df = pd.DataFrame()  # 用于存储所有 idx 的 gtype_df 数据
+    for idx in range(1000):  # 循环从索引 0 到 999
+        gtype_dict = {}
+        gtype_df = sim_a_gtype(gtype_dict, idx=idx, light=LIGHT)  # 获取单个仿真结果的 gtype_df
+        gtype_df['idx'] = idx  # 添加 idx 列以标识每个组合
+        combined_df = pd.concat([combined_df, gtype_df], ignore_index=True)  # 累积到 combined_df
+    
+    # 保存所有 idx 的结果到一个 CSV 文件
+    combined_df.to_csv(f'./logs/combined_{LIGHT}_simulated_new.csv', index=False)
+    print(f"All results for LIGHT {LIGHT} saved to combined_{LIGHT}_simulated_new.csv")
+        
+# def do_stuff(LIGHT):
+# print(f"Running simulations for LIGHT intensity: {LIGHT}")
+#     for idx in range(1000):  # 循环从索引 0 到 999
+#         gtype_dict = {}
+#         sim_a_gtype(gtype_dict, idx=idx, light=LIGHT)
     # kea3 ={}
     # sim_a_gtype(kea3, 'kea3', LIGHT)
     # time_min = WT['time_axis']/60
@@ -623,26 +629,15 @@ def do_stuff(LIGHT):
     # return (delta_NPQ[idx], delta_LEF[idx],\
     #         delta_NPQ[idx]/WT['NPQ'][idx], delta_LEF[idx]/WT['LEF'][idx])
 
-
-# # Step 3: 遍历每个组合，运行 sim_a_gtype 仿真并保存结果
-# for _, combination in varying_parameters.iterrows():
-#     # 将变化的组合参数与常量合并
-#     simulation_params = {**combination.to_dict(), **constant_parameters}
-    
-#     # 创建一个空字典，用于存储每次仿真结果
-#     gtype_dict = {}
-
-#     # 调用 sim_a_gtype 进行仿真
-#     sim_a_gtype(gtype_dict, gtype='WT', light=100, simulation_params=simulation_params)
-
 global FREQUENCY, LIGHT, T_ATP
 FREQUENCY = 1/60
 result_dict = {}
 light_T = [(100, 165),(500, 60)]
 # light_T = [(50, 200), (100, 165), (250, 100), (500, 60), (1000, 40)]
 for LIGHT, T_ATP in light_T:
-    delta = do_stuff(LIGHT)
-    result_dict[LIGHT] = delta
+    do_stuff(LIGHT)
+    # delta = do_stuff(LIGHT)
+    # result_dict[LIGHT] = delta
 # col_list = ['dNPQ_2min', 'dLEF_2min', 'dNPQ_rel', 'dLEF_rel']    
 # column = {}
 # for i, col in enumerate(col_list):
@@ -650,13 +645,25 @@ for LIGHT, T_ATP in light_T:
 # result_df = pd.DataFrame(result_dict).T
 # result_df.rename(columns = column, inplace= True)
 
-# Step 3: 遍历每个组合，运行 sim_a_gtype 仿真并保存结果
-for _, combination in varying_parameters.iterrows():
-    # 将变化的组合参数与常量合并
-    simulation_params = {**combination.to_dict(), **constant_parameters}
-    
-    # 创建一个空字典，用于存储每次仿真结果
-    gtype_dict = {}
 
-    # 调用 sim_a_gtype 进行仿真
-    sim_a_gtype(gtype_dict, gtype='WT', light=100, simulation_params=simulation_params)
+
+# # 读取数据
+# data_100 = pd.read_csv('./logs/combined_100_simulated.csv')
+# data_500 = pd.read_csv('./logs/combined_500_simulated.csv')
+
+# # 绘制 NPQ vs idx
+# plt.figure(figsize=(10, 6))
+
+# # 100 光强下的 NPQ vs idx
+# plt.plot(data_100['idx'], data_100['NPQ'], label='Light Intensity 100', marker='o', linestyle='-')
+
+# # 500 光强下的 NPQ vs idx
+# plt.plot(data_500['idx'], data_500['NPQ'], label='Light Intensity 500', marker='o', linestyle='-')
+
+# # 图例、标题和标签
+# plt.xlabel('Index (idx)')
+# plt.ylabel('NPQ')
+# plt.title('NPQ vs idx under Different Light Intensities')
+# plt.legend()
+# plt.grid(True)
+# plt.show()
