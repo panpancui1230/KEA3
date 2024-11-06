@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import pandas as pd
-# 读取数据
+# read data
 data_100 = pd.read_csv('./logs/combined_100_simulated.csv')
 # data_500 = pd.read_csv('./logs/combined_500_simulated.csv')
 
