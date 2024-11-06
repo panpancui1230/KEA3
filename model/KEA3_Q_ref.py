@@ -1665,10 +1665,10 @@ def do_complete_sim(y00, t_end, Kx):
         if np.isnan(output['K_flux'][i]):
             output['K_flux'][i]=output['K_flux'][i-1]
 
-    # calculate the deficit in ATP/NADPH and store it in output['deficit']
-    output['deficit']=(output['LEF_to_NADPH']*(3.0/Kx.n)-output['ATP_rate'])  
-    output['deficit_int']=integrate.cumtrapz(output['deficit'], output['time_axis'], initial=0)
-    output['fract_deficit']=output['deficit_int']/output['LEF_to_NADPH']
+    # # calculate the deficit in ATP/NADPH and store it in output['deficit']
+    # output['deficit']=(output['LEF_to_NADPH']*(3.0/Kx.n)-output['ATP_rate'])  
+    # output['deficit_int']=integrate.cumtrapz(output['deficit'], output['time_axis'], initial=0)
+    # output['fract_deficit']=output['deficit_int']/output['LEF_to_NADPH']
 
     return(output)
 
